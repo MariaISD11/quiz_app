@@ -19,16 +19,21 @@ export function Auth() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    console.log("Auth: handleSubmit START", { isLogin, email: formData.email });
     setError(null);
     
     try {
       if (isLogin) {
-        await login(formData.email, formData.password);
+        console.log("Auth: calling login...");
+        const user = await login(formData.email, formData.password);
+        console.log("Auth: login SUCCESS", user);
       } else {
+        console.log("Auth: calling register...");
         await register(formData);
+        console.log("Auth: register SUCCESS");
       }
     } catch (err) {
-      console.error(err);
+      console.error("Auth: SUBMIT ERROR", err);
       if (err.message?.includes('Email already in use') || err.code === '23505') {
         setError('REGISTER_ERROR');
       } else {

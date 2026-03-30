@@ -32,7 +32,7 @@ export function Layout({ children, className }) {
           )}
         </div>
       </header>
-      <main className="max-w-4xl mx-auto px-6 py-8 animate-in fade-in duration-700">
+      <main className="max-w-4xl mx-auto px-6 py-8">
         {children}
       </main>
     </div>

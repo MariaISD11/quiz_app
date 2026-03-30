@@ -36,7 +36,7 @@ CREATE TABLE public.user_roles (
 
 CREATE TABLE public.categories (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
@@ -44,7 +44,7 @@ CREATE TABLE public.categories (
 
 CREATE TABLE public.cards (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   category_id UUID NOT NULL REFERENCES public.categories(id) ON DELETE CASCADE,
   learn_object_type TEXT NOT NULL CHECK (learn_object_type IN ('text', 'image')),
   learn_object TEXT NOT NULL,

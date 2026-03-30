@@ -6,7 +6,17 @@ import { Auth } from '@/pages/Auth';
 import { useQuiz } from '@/hooks/useQuiz';
 
 function App() {
-  const { currentUser, addCategory, updateCategory, deleteCategory, addCard, updateCard, deleteCard, moveCard } = useQuiz();
+  const { 
+    currentUser, 
+    addCategory, 
+    updateCategory, 
+    deleteCategory, 
+    addCard, 
+    updateCard, 
+    deleteCard, 
+    moveCard 
+  } = useQuiz();
+  
   const [currentPage, setCurrentPage] = useState('categories');
   const [selectedCategory, setSelectedCategory] = useState(null);
 
