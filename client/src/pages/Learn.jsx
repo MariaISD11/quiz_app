@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useQuiz } from '@/hooks/useQuiz';
 import { useTranslation, LOCALE_KEYS } from '@/services/localization';
 import { Card } from '@/components/common/Card';
@@ -19,6 +19,11 @@ export function Learn({ category, onBack }) {
   const [isFinished, setIsFinished] = useState(false);
   const [swipeDirection, setSwipeDirection] = useState(null);
 
+  // Swipe logic
+  const [touchStart, setTouchStart] = useState(null);
+  const [touchEnd, setTouchEnd] = useState(null);
+  const minSwipeDistance = 50;
+
   const initialCardsCount = getCardsByCategory(category.id).length;
 
   if (category.id !== currentCategoryId) {
@@ -34,6 +39,7 @@ export function Learn({ category, onBack }) {
   const currentCard = queue[currentIndex];
 
   const handleNext = (isCorrect) => {
+    if (swipeDirection) return;
     setSwipeDirection(isCorrect ? 'right' : 'left');
     
     setTimeout(() => {
@@ -43,17 +49,40 @@ export function Learn({ category, onBack }) {
       if (isCorrect) {
         setPassedCount(prev => Math.min(prev + 1, initialCardsCount));
       } else {
-        setQueue(prev => [...prev, currentCard]);
+        // Move to the end of queue if incorrect
+        setQueue(prev => {
+          const newQueue = [...prev];
+          const current = newQueue[currentIndex];
+          return [...newQueue, current];
+        });
       }
 
-      if (currentIndex < queue.length - 1) {
-        setCurrentIndex(prev => prev + 1);
-      } else if (isCorrect) {
+      setCurrentIndex(prev => prev + 1);
+      
+      if (isCorrect && currentIndex >= queue.length - 1) {
         setIsFinished(true);
-      } else {
-         setCurrentIndex(prev => prev + 1);
       }
     }, 400);
+  };
+
+  const onTouchStart = (e) => {
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+
+  const onTouchMove = (e) => setTouchEnd(e.targetTouches[0].clientX);
+
+  const onTouchEnd = () => {
+    if (!touchStart || !touchEnd || !isFlipped) return;
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+
+    if (isLeftSwipe) {
+      handleNext(false);
+    } else if (isRightSwipe) {
+      handleNext(true);
+    }
   };
 
   if (isFinished) {
@@ -98,21 +127,24 @@ export function Learn({ category, onBack }) {
         </div>
       </div>
 
-      <div className="perspective-1000 w-full h-[450px] mb-12 relative overflow-hidden">
+      <div className="perspective-1000 w-full h-[450px] mb-12 relative overflow-hidden touch-none">
         <div 
           className={cn(
-            "relative w-full h-full transition-all duration-500 transform-style-3d cursor-pointer",
+            "relative w-full h-full transition-all duration-500 transform-style-3d cursor-pointer select-none",
             isFlipped ? "rotate-y-180" : "",
             swipeDirection === 'left' ? "-translate-x-[150%] -rotate-12 opacity-0" : "",
             swipeDirection === 'right' ? "translate-x-[150%] rotate-12 opacity-0" : ""
           )}
           onClick={() => !swipeDirection && setIsFlipped(!isFlipped)}
+          onTouchStart={onTouchStart}
+          onTouchMove={onTouchMove}
+          onTouchEnd={onTouchEnd}
         >
           {/* Front */}
           <Card className="absolute inset-0 backface-hidden flex flex-col items-center justify-center p-8 text-center shadow-xl border-2 hover:border-green-500 transition-colors">
             <div className="flex-1 flex items-center justify-center w-full">
               {currentCard.learn_object_type === 'image' ? (
-                <img src={currentCard.learn_object} alt="Learn object" className="max-w-full max-h-[350px] rounded-xl object-contain" />
+                <img src={currentCard.learn_object} alt="Learn object" className="max-w-full max-h-[350px] rounded-xl object-contain pointer-events-none" />
               ) : (
                 <h3 className="text-4xl font-bold tracking-tight leading-tight">{currentCard.learn_object}</h3>
               )}
@@ -129,6 +161,7 @@ export function Learn({ category, onBack }) {
                   <p className="text-gray-500 italic text-lg leading-relaxed">"{currentCard.example}"</p>
                 </div>
               )}
+              <p className="text-gray-400 pt-8 text-xs uppercase tracking-widest font-bold">Swipe left (Wrong) / Right (Correct)</p>
             </div>
           </Card>
         </div>
@@ -140,17 +173,17 @@ export function Learn({ category, onBack }) {
             <Button 
               variant="secondary" 
               className="flex-1 h-20 text-xl bg-red-50 dark:bg-red-950/20 text-red-600 hover:bg-red-100 border-2 border-red-100 dark:border-red-900/30"
-              onClick={() => handleNext(false)}
+              onClick={(e) => { e.stopPropagation(); handleNext(false); }}
             >
               <X size={32} />
-              {t(LOCALE_KEYS.SWIPE_LEFT)}
+              {t(LOCALE_KEYS.SWIPE_LEFT) || "Wrong"}
             </Button>
             <Button 
               className="flex-1 h-20 text-xl shadow-lg shadow-green-500/20"
-              onClick={() => handleNext(true)}
+              onClick={(e) => { e.stopPropagation(); handleNext(true); }}
             >
               <Check size={32} />
-              {t(LOCALE_KEYS.SWIPE_RIGHT)}
+              {t(LOCALE_KEYS.SWIPE_RIGHT) || "Correct"}
             </Button>
           </div>
         )}

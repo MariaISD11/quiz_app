@@ -108,7 +108,7 @@ export function Categories({ onSelectCategory, onAddCategory, onUpdateCategory }
                       <h3 className="text-xl font-semibold mb-1 group-hover:text-green-600 transition-colors">{cat.name}</h3>
                       <button 
                         onClick={(e) => startEdit(e, cat)}
-                        className="opacity-0 group-hover/title:opacity-100 p-1 text-gray-400 hover:text-green-600 transition-all"
+                        className="opacity-100 lg:opacity-0 lg:group-hover/title:opacity-100 p-1 text-gray-400 hover:text-green-600 transition-all"
                       >
                         <Edit2 size={14} />
                       </button>
@@ -116,7 +116,7 @@ export function Categories({ onSelectCategory, onAddCategory, onUpdateCategory }
                   )}
                   <p className="text-gray-500 text-sm font-medium">{getCategoryStats(cat.id)} {t(LOCALE_KEYS.CARDS) || 'cards'}</p>
                 </div>
-                <div className="p-2 rounded-full bg-green-50 dark:bg-green-900/30 text-green-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="p-2 rounded-full bg-green-50 dark:bg-green-900/30 text-green-600 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
                   <ChevronRight size={20} />
                 </div>
               </div>

@@ -4,6 +4,7 @@ import { useTranslation, LOCALE_KEYS } from '@/services/localization';
 import { Card } from '@/components/common/Card';
 import { Button } from '@/components/common/Button';
 import { Layout } from '@/components/layouts/Layout';
+import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { ArrowLeft, Plus, Image as ImageIcon, Edit2, Type, Upload, X, Trash2 } from 'lucide-react';
 
 export function Cards({ category, onBack, onDeleteCategory, onAddCard, onUpdateCard, onDeleteCard, onMoveCard }) {
@@ -14,6 +15,14 @@ export function Cards({ category, onBack, onDeleteCategory, onAddCard, onUpdateC
   const [editingCard, setEditingCard] = useState(null);
   const fileInputRef = useRef(null);
   
+  // State for Custom Confirm Dialog
+  const [confirmConfig, setConfirmConfig] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+  });
+
   const [formData, setFormData] = useState({
     learnObjectType: 'text',
     learnObject: '',
@@ -61,6 +70,7 @@ export function Cards({ category, onBack, onDeleteCategory, onAddCard, onUpdateC
       example: card.example || '',
     });
     setIsAdding(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleFileUpload = (e) => {
@@ -72,6 +82,30 @@ export function Cards({ category, onBack, onDeleteCategory, onAddCard, onUpdateC
       };
       reader.readAsDataURL(file);
     }
+  };
+
+  const openDeleteCategoryConfirm = () => {
+    setConfirmConfig({
+      isOpen: true,
+      title: "Delete Category",
+      message: `Are you sure you want to delete the entire category "${category.name}" and all its ${cards.length} cards? This action cannot be undone.`,
+      onConfirm: () => {
+        onDeleteCategory(category.id);
+        setConfirmConfig({ ...confirmConfig, isOpen: false });
+      }
+    });
+  };
+
+  const openDeleteCardConfirm = (card) => {
+    setConfirmConfig({
+      isOpen: true,
+      title: "Delete Card",
+      message: "Are you sure you want to delete this card? This action cannot be undone.",
+      onConfirm: () => {
+        onDeleteCard(card.id);
+        setConfirmConfig({ ...confirmConfig, isOpen: false });
+      }
+    });
   };
 
   return (
@@ -87,11 +121,7 @@ export function Cards({ category, onBack, onDeleteCategory, onAddCard, onUpdateC
         <Button 
           variant="ghost" 
           className="text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30"
-          onClick={() => {
-            if (confirm(`Are you sure you want to delete the entire category "${category.name}" and all its cards?`)) {
-              onDeleteCategory(category.id);
-            }
-          }}
+          onClick={openDeleteCategoryConfirm}
         >
           <Trash2 size={20} className="mr-2" />
           Delete Category
@@ -230,7 +260,7 @@ export function Cards({ category, onBack, onDeleteCategory, onAddCard, onUpdateC
               <h4 className="font-semibold text-lg truncate">{card.learn_object_type === 'image' ? 'Image card' : card.learn_object}</h4>
               <p className="text-gray-500 text-sm truncate">{card.answer}</p>
             </div>
-            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="flex items-center gap-1 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
               <Button 
                 variant="ghost" 
                 className="p-2 hover:text-green-600"
@@ -243,9 +273,7 @@ export function Cards({ category, onBack, onDeleteCategory, onAddCard, onUpdateC
                 className="p-2 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30"
                 onClick={(e) => {
                   e.stopPropagation();
-                  if (confirm('Are you sure you want to delete this card?')) {
-                    onDeleteCard(card.id);
-                  }
+                  openDeleteCardConfirm(card);
                 }}
               >
                 <Trash2 size={18} />
@@ -254,6 +282,14 @@ export function Cards({ category, onBack, onDeleteCategory, onAddCard, onUpdateC
           </Card>
         ))}
       </div>
+
+      <ConfirmDialog 
+        isOpen={confirmConfig.isOpen}
+        title={confirmConfig.title}
+        message={confirmConfig.message}
+        onConfirm={confirmConfig.onConfirm}
+        onCancel={() => setConfirmConfig({ ...confirmConfig, isOpen: false })}
+      />
     </Layout>
   );
 }

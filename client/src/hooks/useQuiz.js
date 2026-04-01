@@ -2,23 +2,53 @@ import { useCallback, useEffect } from 'react';
 import { create } from 'zustand';
 import { supabase } from '@/services/supabase';
 
-// 1. Zustand Store - Стан та всі дії
+// 1. Zustand Store - Централізований стан та логіка
 export const useQuizStore = create((set, get) => ({
   currentUser: null,
   userCategories: [],
   cards: [],
   loading: true,
+  isFetching: false, // Блокувальник одночасних запитів
 
   setUser: (user) => set({ currentUser: user }),
   setLoading: (loading) => set({ loading }),
   setUserCategories: (userCategories) => set({ userCategories }),
   setCards: (cards) => set({ cards }),
 
+  // Централізований метод оновлення даних з блокуванням
+  refreshData: async () => {
+    if (get().isFetching) return;
+    set({ isFetching: true });
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        set({ currentUser: session.user });
+        // Виконуємо запити паралельно
+        const [categories, cards] = await Promise.all([
+          supabase.from('categories').select('*').order('created_at', { ascending: false }),
+          supabase.from('cards').select('*').order('created_at', { ascending: false })
+        ]);
+
+        if (!categories.error) set({ userCategories: categories.data || [] });
+        if (!cards.error) set({ cards: cards.data || [] });
+      } else {
+        set({ currentUser: null });
+      }
+    } catch (err) {
+      console.error("Refresh Data Error:", err);
+    } finally {
+      set({ loading: false, isFetching: false });
+    }
+  },
+
   // Auth Actions
   login: async (email, password) => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
     set({ currentUser: data.user });
+    // Відразу завантажуємо дані після логіну
+    await get().refreshData();
     return data.user;
   },
 
@@ -27,21 +57,15 @@ export const useQuizStore = create((set, get) => ({
     set({ currentUser: null, userCategories: [], cards: [] });
   },
 
-  // Database Actions
+  // Database Actions (допоміжні методи для CRUD зазвичай не потребують повного refreshData)
   fetchCategories: async () => {
-    try {
-      const { data, error } = await supabase.from('categories').select('*').order('created_at', { ascending: false });
-      if (error) throw error;
-      set({ userCategories: data || [] });
-    } catch (err) { console.error("fetchCategories Error:", err); }
+    const { data, error } = await supabase.from('categories').select('*').order('created_at', { ascending: false });
+    if (!error) set({ userCategories: data || [] });
   },
 
   fetchCards: async () => {
-    try {
-      const { data, error } = await supabase.from('cards').select('*').order('created_at', { ascending: false });
-      if (error) throw error;
-      set({ cards: data || [] });
-    } catch (err) { console.error("fetchCards Error:", err); }
+    const { data, error } = await supabase.from('cards').select('*').order('created_at', { ascending: false });
+    if (!error) set({ cards: data || [] });
   },
 
   addCategory: async (name) => {
@@ -71,11 +95,9 @@ export const useQuizStore = create((set, get) => ({
   },
 
   addCard: async (card) => {
-    console.log("addCard: STARTING", card);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("No active session found");
-
+      if (!user) return null;
       const dbCard = {
         user_id: user.id,
         category_id: card.categoryId || card.category_id,
@@ -84,25 +106,11 @@ export const useQuizStore = create((set, get) => ({
         answer: card.answer,
         example: card.example || '',
       };
-
-      console.log("addCard: Sending to DB", dbCard);
-
-      const { data, error } = await supabase
-        .from('cards')
-        .insert([dbCard])
-        .select()
-        .single();
-
+      const { data, error } = await supabase.from('cards').insert([dbCard]).select().single();
       if (error) throw error;
-      
-      console.log("addCard: SUCCESS", data);
       set((state) => ({ cards: [data, ...state.cards] }));
       return data;
-    } catch (err) {
-      console.error("addCard: ERROR", err);
-      alert("Failed to save card: " + (err.message || "Unknown error"));
-      return null;
-    }
+    } catch (err) { return null; }
   },
 
   updateCard: async (id, updates) => {
@@ -131,42 +139,39 @@ export const useQuizStore = create((set, get) => ({
 }));
 
 // 2. Хук ініціалізації та використання
-let authListenerActive = false;
-
 export function useQuiz() {
   const store = useQuizStore();
 
   useEffect(() => {
-    if (authListenerActive) return;
-    authListenerActive = true;
+    // 1. Початкове завантаження (виконується ОДИН раз при монтуванні)
+    store.refreshData();
 
-    const initialize = async () => {
-      // 1. Миттєва перевірка існуючої сесії
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        store.setUser(session.user);
-        await Promise.all([store.fetchCategories(), store.fetchCards()]);
+    // 2. Слухач авторизації (ТІЛЬКИ зміна стану користувача)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN') {
+        store.setUser(session?.user || null);
+        // Рефетч тут не робимо, бо він або вже зроблений в initialize, або буде в login()
+      } else if (event === 'SIGNED_OUT') {
+        store.setUser(null);
+        store.setUserCategories([]);
+        store.setCards([]);
       }
-      store.setLoading(false);
+    });
 
-      // 2. Слухач майбутніх змін
-      supabase.auth.onAuthStateChange(async (event, session) => {
-        if (event === 'SIGNED_IN' && session?.user) {
-          store.setUser(session.user);
-          store.setLoading(true);
-          await Promise.all([store.fetchCategories(), store.fetchCards()]);
-          store.setLoading(false);
-        } else if (event === 'SIGNED_OUT') {
-          store.setUser(null);
-          store.setUserCategories([]);
-          store.setCards([]);
-          store.setLoading(false);
-        }
-      });
+    // 3. Єдиний тригер оновлення при поверненні на сторінку
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        store.refreshData();
+      }
     };
 
-    initialize();
-  }, []);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      subscription.unsubscribe();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []); // Порожній масив - гарантія одного запуску
 
   const getCardsByCategory = useCallback((categoryId) => {
     return store.cards.filter(c => c.category_id === categoryId);
