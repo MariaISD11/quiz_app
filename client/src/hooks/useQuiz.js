@@ -52,6 +52,24 @@ export const useQuizStore = create((set, get) => ({
     return data.user;
   },
 
+  register: async ({ email, password, name }) => {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          user_name: name,
+          full_name: name, // Для сумісності
+        },
+      },
+    });
+    if (error) throw error;
+    set({ currentUser: data.user });
+    // Відразу завантажуємо дані після реєстрації
+    await get().refreshData();
+    return data.user;
+  },
+
   logout: async () => {
     await supabase.auth.signOut();
     set({ currentUser: null, userCategories: [], cards: [] });
@@ -110,7 +128,10 @@ export const useQuizStore = create((set, get) => ({
       if (error) throw error;
       set((state) => ({ cards: [data, ...state.cards] }));
       return data;
-    } catch (err) { return null; }
+    } catch (error) { 
+      console.error("Add Card Error:", error);
+      return null; 
+    }
   },
 
   updateCard: async (id, updates) => {

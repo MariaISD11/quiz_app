@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { useQuiz } from '@/hooks/useQuiz';
 import { useTranslation, LOCALE_KEYS } from '@/services/localization';
 import { Card } from '@/components/common/Card';
